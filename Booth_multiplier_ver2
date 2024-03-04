@@ -1,0 +1,101 @@
+init:		JMP	CTE
+			init_aux
+AUX:		0b00000000
+Q:			0b00000000
+Q_1:		0b00000000
+M:			0b00000000
+N:			0b00001000
+init_aux:	MOV	DPTR, CTE	#Loads $AUX to DPTR
+			AUX
+			MOV	ACC, CTE	#Loads 0x00 to ACC
+			0b00000000             
+			MOV	[DPTR], ACC	#Loads 0 to $AUX
+init_q_1:	MOV	DPTR, CTE	#Loads $Q_1 to DPTR
+			Q_1
+			MOV	ACC, CTE	#Loads 0x00 to ACC
+			0b00000000             
+			MOV	[DPTR], ACC	#Loads 0 to $Q_1
+init_n:		MOV	DPTR, CTE	#Loads $N to DPTR
+			N
+			MOV	ACC, CTE	#Loads 0x8 to ACC
+			0b00001000             
+			MOV	[DPTR], ACC	#Loads 0x8 to $N
+INIT_LOOP:	MOV	ACC, [DIR]	#Loads N to ACC
+			N
+neg_n:		CA2	ACC			#Two's complement of ACC(N)
+loop_test:	JN				#Jumps to the loop if ACC negative (i<N)
+			booth_mul       
+			JMP	CTE			#Breaks the loop if ACC>=0 (i>=N)
+			END_LOOP        
+booth_mul:	MOV	ACC, [DIR]	#Loads Q_1 to ACC
+			Q_1
+			MOV	A, ACC		#Loads ACC(LSB of Q_1) to A
+			MOV	ACC, [DIR]	#Loads Q to ACC
+			Q
+			AND	ACC, CTE	#Masks the LSB of Q in ACC
+			0b00000001
+			XOR	ACC, A		#ACC(LSB of Q) XOR A(LSB of Q_1)
+			JZ				#Jumps to the label if ACC = 0 (LSB of Q = LSB of Q_1)
+			q0_q1_eq
+q0_q1_diff:	MOV	ACC, [DIR]	#Loads M to ACC
+			M
+			MOV	A, ACC		#Loads ACC(M) to A
+			MOV	ACC, [DIR]	#Loads Q_1 to ACC
+			Q_1
+			CA2	ACC			#Two's complement of ACC(-(LSB of Q_1))
+			JN				#Jumps to the label if ACC < 0 (LSB of Q_1 = 1)
+			q1_one
+q1_zero:	CA2	A			#Two's complement of A(M)
+q1_one:		MOV	DPTR, CTE	#Loads $AUX to DPTR
+			AUX
+			MOV	ACC, [DPTR]	#Loads AUX to ACC
+			ADD	ACC, A		#Adds A(-M o M) to ACC(AUX) (AUX + (-M o M))
+			MOV	[DPTR], ACC	#Loads ACC to $AUX (AUX = AUX + (-M o M))
+q0_q1_eq:	MOV	DPTR, CTE	#Loads $Q_1 to DPTR
+			Q_1
+			MOV	ACC, [DIR]	#Loads Q to ACC
+			Q
+			AND	ACC, CTE	#Masks the LSB of Q in ACC
+			0b00000001
+			MOV	[DPTR], ACC	#Loads ACC(LSB of Q) to $Q_1
+q_shift:	MOV	ACC, [DIR]	#Loads AUX to ACC
+			AUX
+			AND	ACC, CTE	#Masks the LSB of AUX in ACC
+			0b00000001
+			MOV	A, ACC		#Loads ACC(LSB of AUX) to A
+			JZ				#Jumps to the label if ACC=0 (LSB of AUX = 0)
+			la0
+la1:		MOV	ACC, CTE	#Loads 0x80 to ACC
+			0b10000000
+			MOV	A, ACC		#Loads ACC to A
+la0:		MOV	DPTR, CTE	#Loads $Q to DPTR
+			Q
+			MOV	ACC, [DPTR]	#Loads Q to ACC
+			SSR	ACC			#Logical right shift of ACC(Q)
+			OR	ACC, A		#Puts the LSB of AUX to the MSB of Q
+			MOV	[DPTR], ACC	#Loads ACC (Q shifted with AUX's MSB) to $Q
+aux_shift:	MOV	DPTR, CTE	#Loads $AUX to DPTR
+			AUX
+			MOV	ACC, [DPTR]	#Loads AUX to ACC
+			AND	ACC, CTE	#Masks the MSB of AUX in ACC
+			0b10000000
+			MOV	A, ACC		#Loads ACC to A
+			MOV ACC, [DPTR]	#Loads AUX to ACC
+			SSR	ACC			#Logical right shift of ACC(AUX)
+			OR	ACC, A		#Puts the MSB of AUX to the MSB of ACC(AUX shifted)
+			MOV	[DPTR],ACC	#Loads ACC (AUX arithmetic shifted) to $AUX
+dec_n:		MOV	DPTR, CTE	#Loads $N to DPTR
+			N
+			MOV	ACC, [DPTR]	#Loads N to ACC
+			MOV	A, ACC		#Loads ACC to A
+			MOV	ACC, CTE	#Loads 0xFF(-1) to ACC
+			0b11111111
+			ADD	ACC, A		#Adds A(N) to ACC(-1) (N-1)
+			MOV	[DPTR], ACC	#Loads ACC(N-1) to $N
+goto_init:	JMP	CTE			#Jumps to the start of the loop
+			INIT_LOOP
+END_LOOP:	MOV	ACC, [DIR]	#Loads AUX(RES_H) to ACC
+			AUX
+			MOV	A,ACC		#Loads AUX(RES_H) to A
+			MOV	ACC, [DIR]	#Loads Q(RES_L) to ACC
+			Q
